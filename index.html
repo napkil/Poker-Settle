@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Settle - 撲克結算</title>
+    <!-- 引入 Pico.css CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    
+    <style>
+        /* 自定義樣式 */
+        body {
+            padding: 1rem;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .tab-button {
+            flex: 1;
+            padding: 0.75rem;
+            border: 2px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .section {
+            display: none;
+        }
+        
+        .section.active {
+            display: block;
+        }
+        
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            background: var(--card-background-color);
+            border-radius: 0.5rem;
+        }
+        
+        .delete-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            background: var(--del-color);
+            border: none;
+            color: white;
+            border-radius: 0.25rem;
+        }
+        
+        .transaction-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            align-items: end;
+        }
+        
+        .transaction-form > div {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .button-group {
+            grid-column: span 2;
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .quick-amounts {
+            grid-column: span 2;
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .quick-amount-btn {
+            flex: 1;
+            padding: 0.5rem;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            font-size: 0.9rem;
+        }
+        
+        .chip-input-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: var(--card-background-color);
+            border-radius: 0.5rem;
+        }
+        
+        .chip-input {
+            width: 100px;
+            margin-left: 1rem;
+        }
+        
+        .error {
+            color: var(--del-color);
+            font-weight: bold;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .summary-item {
+            text-align: center;
+            padding: 1rem;
+            background: var(--card-background-color);
+            border-radius: 0.5rem;
+        }
+        
+        .tolerance-setting {
+            margin: 1rem 0;
+            text-align: center;
+        }
+        
+        .tolerance-input {
+            width: 80px;
+            margin: 0 0.5rem;
+        }
+        
+        .player-result {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            background: var(--card-background-color);
+            border-radius: 0.5rem;
+        }
+        
+        .win-amount {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .lose-amount {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .settlement-result {
+            margin-top: 1rem;
+        }
+        
+        @media (max-width: 576px) {
+            .tab-buttons {
+                flex-direction: column;
+            }
+            
+            .transaction-form {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group, .quick-amounts {
+                grid-column: span 1;
+                flex-direction: column;
+            }
+            
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h1>Poker Settle - 撲克結算</h1>
+        
+        <!-- Tab 導航 -->
+        <div class="tab-buttons">
+            <button class="tab-button active" onclick="switchTab('players')">玩家管理</button>
+            <button class="tab-button" onclick="switchTab('transactions')">記帳</button>
+            <button class="tab-button" onclick="switchTab('settle')">結算</button>
+        </div>
+        
+        <!-- 玩家管理分頁 -->
+        <section id="players-section" class="section active">
+            <article>
+                <header>玩家管理</header>
+                <form id="player-form">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="player-name" placeholder="輸入玩家名稱" required style="flex: 1;">
+                        <button type="submit">新增玩家</button>
+                    </div>
+                </form>
+                <div id="players-list">
+                    <!-- 玩家列表將在這裡動態生成 -->
+                </div>
+            </article>
+        </section>
+        
+        <!-- 記帳分頁 -->
+        <section id="transactions-section" class="section">
+            <article>
+                <header>記帳</header>
+                <form id="transaction-form" class="transaction-form">
+                    <div>
+                        <label for="player-select">選擇玩家</label>
+                        <select id="player-select" required>
+                            <option value="">請選擇玩家</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="amount-input">金額</label>
+                        <input type="number" id="amount-input" placeholder="輸入金額" required min="1">
+                    </div>
+                    <div class="quick-amounts">
+                        <button type="button" class="quick-amount-btn" onclick="setQuickAmount(500)">$500</button>
+                        <button type="button" class="quick-amount-btn" onclick="setQuickAmount(1000)">$1000</button>
+                        <button type="button" class="quick-amount-btn" onclick="setQuickAmount(2000)">$2000</button>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" onclick="addTransaction('buy-in')">新增買入</button>
+                        <button type="button" onclick="addTransaction('add-on')">新增加碼</button>
+                    </div>
+                </form>
+                <div id="transactions-list">
+                    <!-- 交易記錄將在這裡動態生成 -->
+                </div>
+            </article>
+        </section>
+        
+        <!-- 結算分頁 -->
+        <section id="settle-section" class="section">
+            <!-- 輸入最終籌碼 -->
+            <article>
+                <header>輸入最終籌碼</header>
+                <div id="chip-inputs">
+                    <!-- 籌碼輸入將在這裡動態生成 -->
+                </div>
+            </article>
+            
+            <!-- 結算控制 -->
+            <article>
+                <header>結算控制</header>
+                <div class="tolerance-setting">
+                    <label for="tolerance-input">容錯差額：$</label>
+                    <input type="number" id="tolerance-input" class="tolerance-input" value="20" min="0" onchange="updateTolerance(this.value)">
+                </div>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <strong>籌碼合計</strong>
+                        <div id="total-chips">$0</div>
+                    </div>
+                    <div class="summary-item">
+                        <strong>買入合計</strong>
+                        <div id="total-buy-in">$0</div>
+                    </div>
+                    <div class="summary-item">
+                        <strong>差額</strong>
+                        <div id="difference">$0</div>
+                    </div>
+                </div>
+                <button onclick="calculateSettlement()" style="width: 100%; margin-top: 1rem;">計算結果</button>
+            </article>
+            
+            <!-- 結算結果 -->
+            <article id="settlement-result" style="display: none;">
+                <header>玩家輸贏結果</header>
+                <div id="player-results">
+                    <!-- 玩家輸贏結果將在這裡顯示 -->
+                </div>
+                
+                <header style="margin-top: 2rem;">轉帳指示</header>
+                <div id="settlement-paths">
+                    <!-- 結算路徑將在這裡顯示 -->
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <script>
+        // 全域狀態管理
+        const appState = {
+            players: [],
+            transactions: [],
+            finalChips: {},
+            settings: {
+                tolerance: 20,
+                roundTo: 1
+            },
+            nextPlayerId: 1,
+            nextTransactionId: 1
+        };
+
+        // Tab 切換功能
+        function switchTab(tabName) {
+            // 移除所有 active class
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+            
+            // 添加 active class 到選中的 tab
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-section').classList.add('active');
+            
+            // 根據分頁更新內容
+            if (tabName === 'transactions') {
+                renderPlayerSelect();
+            } else if (tabName === 'settle') {
+                renderChipInputs();
+                updateSummary();
+            }
+        }
+
+        // 渲染玩家列表
+        function renderPlayers() {
+            const container = document.getElementById('players-list');
+            
+            if (appState.players.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--muted-color); margin: 2rem 0;">請先新增至少兩位玩家</p>';
+                return;
+            }
+            
+            const playersHTML = appState.players.map(player => 
+                '<div class="player-item">' +
+                    '<span>' + player.name + '</span>' +
+                    '<button class="delete-btn" onclick="removePlayer(' + player.id + ')">刪除</button>' +
+                '</div>'
+            ).join('');
+            
+            container.innerHTML = playersHTML;
+        }
+
+        // 新增玩家
+        function addPlayer(name) {
+            if (!name.trim()) return;
+            
+            // 檢查是否重複
+            if (appState.players.some(p => p.name === name.trim())) {
+                alert('玩家名稱已存在！');
+                return;
+            }
+            
+            appState.players.push({
+                id: appState.nextPlayerId++,
+                name: name.trim()
+            });
+            
+            renderPlayers();
+            document.getElementById('player-name').value = '';
+        }
+
+        // 移除玩家
+        function removePlayer(playerId) {
+            if (confirm('確定要刪除此玩家嗎？相關的交易記錄也會被刪除。')) {
+                appState.players = appState.players.filter(p => p.id !== playerId);
+                appState.transactions = appState.transactions.filter(t => t.playerId !== playerId);
+                delete appState.finalChips[playerId];
+                
+                renderPlayers();
+                renderTransactions();
+            }
+        }
+
+        // 渲染玩家選擇下拉選單
+        function renderPlayerSelect() {
+            const select = document.getElementById('player-select');
+            select.innerHTML = '<option value="">請選擇玩家</option>' +
+                appState.players.map(player => 
+                    '<option value="' + player.id + '">' + player.name + '</option>'
+                ).join('');
+        }
+
+        // 設定快速金額
+        function setQuickAmount(amount) {
+            document.getElementById('amount-input').value = amount;
+        }
+
+        // 新增交易
+        function addTransaction(type) {
+            const playerId = parseInt(document.getElementById('player-select').value);
+            const amount = parseInt(document.getElementById('amount-input').value);
+            
+            if (!playerId || !amount) {
+                alert('請選擇玩家並輸入金額！');
+                return;
+            }
+            
+            const player = appState.players.find(p => p.id === playerId);
+            if (!player) return;
+            
+            appState.transactions.push({
+                id: appState.nextTransactionId++,
+                playerId: playerId,
+                playerName: player.name,
+                type: type,
+                amount: amount,
+                timestamp: new Date()
+            });
+            
+            // 清空表單
+            document.getElementById('player-select').value = '';
+            document.getElementById('amount-input').value = '';
+            
+            renderTransactions();
+        }
+
+        // 渲染交易記錄
+        function renderTransactions() {
+            const container = document.getElementById('transactions-list');
+            
+            if (appState.transactions.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--muted-color); margin: 2rem 0;">暫無交易記錄</p>';
+                return;
+            }
+            
+            const tableHTML = 
+                '<table style="margin-top: 1rem;">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th>玩家</th>' +
+                            '<th>類型</th>' +
+                            '<th>金額</th>' +
+                            '<th>時間</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody>' +
+                        appState.transactions.map(t => 
+                            '<tr>' +
+                                '<td>' + t.playerName + '</td>' +
+                                '<td>' + (t.type === 'buy-in' ? '買入' : '加碼') + '</td>' +
+                                '<td>$' + t.amount + '</td>' +
+                                '<td>' + t.timestamp.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) + '</td>' +
+                            '</tr>'
+                        ).join('') +
+                    '</tbody>' +
+                '</table>';
+            
+            container.innerHTML = tableHTML;
+        }
+
+        // 渲染籌碼輸入
+        function renderChipInputs() {
+            const container = document.getElementById('chip-inputs');
+            
+            if (appState.players.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--muted-color);">請先新增玩家</p>';
+                return;
+            }
+            
+            const inputsHTML = appState.players.map(player => 
+                '<div class="chip-input-row">' +
+                    '<span>' + player.name + '</span>' +
+                    '<input type="number" class="chip-input" placeholder="籌碼" value="' + (appState.finalChips[player.id] || '') + '" onchange="updateFinalChips(' + player.id + ', this.value)">' +
+                '</div>'
+            ).join('');
+            
+            container.innerHTML = inputsHTML;
+        }
+
+        // 更新最終籌碼
+        function updateFinalChips(playerId, value) {
+            if (value === '') {
+                delete appState.finalChips[playerId];
+            } else {
+                appState.finalChips[playerId] = parseInt(value) || 0;
+            }
+            updateSummary();
+        }
+
+        // 更新容錯設定
+        function updateTolerance(value) {
+            appState.settings.tolerance = parseInt(value) || 0;
+            updateSummary();
+        }
+
+        // 更新摘要資訊
+        function updateSummary() {
+            const totalChips = Object.values(appState.finalChips).reduce((sum, chips) => sum + chips, 0);
+            const totalBuyIn = appState.transactions.reduce((sum, t) => sum + t.amount, 0);
+            const difference = totalChips - totalBuyIn;
+            
+            document.getElementById('total-chips').textContent = '$' + totalChips;
+            document.getElementById('total-buy-in').textContent = '$' + totalBuyIn;
+            
+            const diffElement = document.getElementById('difference');
+            diffElement.textContent = '$' + difference;
+            
+            if (Math.abs(difference) > appState.settings.tolerance) {
+                diffElement.className = 'error';
+            } else {
+                diffElement.className = '';
+            }
+        }
+
+        // 計算結算
+        function calculateSettlement() {
+            // 檢查是否所有玩家都輸入了籌碼
+            const missingChips = appState.players.filter(p => !(p.id in appState.finalChips));
+            if (missingChips.length > 0) {
+                alert('請為以下玩家輸入最終籌碼：' + missingChips.map(p => p.name).join(', '));
+                return;
+            }
+            
+            // 檢查差額是否在容忍範圍內
+            const totalChips = Object.values(appState.finalChips).reduce((sum, chips) => sum + chips, 0);
+            const totalBuyIn = appState.transactions.reduce((sum, t) => sum + t.amount, 0);
+            const difference = totalChips - totalBuyIn;
+            
+            if (Math.abs(difference) > appState.settings.tolerance) {
+                alert('差額 $' + difference + ' 超出容忍範圍 $' + appState.settings.tolerance + '，請檢查輸入或調整容錯設定！');
+                return;
+            }
+            
+            // 計算每個玩家的淨輸贏
+            const playerBalances = appState.players.map(player => {
+                const buyIn = appState.transactions
+                    .filter(t => t.playerId === player.id)
+                    .reduce((sum, t) => sum + t.amount, 0);
+                const finalChips = appState.finalChips[player.id] || 0;
+                const netWin = finalChips - buyIn;
+                
+                return {
+                    id: player.id,
+                    name: player.name,
+                    buyIn: buyIn,
+                    finalChips: finalChips,
+                    netWin: netWin
+                };
+            });
+            
+            // 顯示玩家輸贏結果
+            renderPlayerResults(playerBalances);
+            
+            // 分離債權人和債務人
+            const creditors = playerBalances.filter(p => p.netWin > 0).sort((a, b) => b.netWin - a.netWin);
+            const debtors = playerBalances.filter(p => p.netWin < 0).sort((a, b) => a.netWin - b.netWin);
+            
+            // 使用貪婪演算法計算最簡轉帳路徑
+            const transfers = [];
+            let i = 0, j = 0;
+            
+            while (i < creditors.length && j < debtors.length) {
+                const creditor = creditors[i];
+                const debtor = debtors[j];
+                
+                const transferAmount = Math.min(creditor.netWin, Math.abs(debtor.netWin));
+                
+                if (transferAmount > 0) {
+                    transfers.push({
+                        from: debtor.name,
+                        to: creditor.name,
+                        amount: transferAmount
+                    });
+                    
+                    creditor.netWin -= transferAmount;
+                    debtor.netWin += transferAmount;
+                }
+                
+                if (creditor.netWin === 0) i++;
+                if (debtor.netWin === 0) j++;
+            }
+            
+            // 顯示轉帳結果
+            renderSettlementResult(transfers);
+        }
+
+        // 渲染玩家輸贏結果
+        function renderPlayerResults(playerBalances) {
+            const container = document.getElementById('player-results');
+            
+            // 按淨輸贏由高到低排序
+            const sortedBalances = playerBalances.sort((a, b) => b.netWin - a.netWin);
+            
+            const resultsHTML = sortedBalances.map(player => {
+                const amountClass = player.netWin >= 0 ? 'win-amount' : 'lose-amount';
+                const amountText = player.netWin >= 0 ? '+$' + player.netWin : '-$' + Math.abs(player.netWin);
+                
+                return '<div class="player-result">' +
+                    '<span>' + player.name + '</span>' +
+                    '<span class="' + amountClass + '">' + amountText + '</span>' +
+                '</div>';
+            }).join('');
+            
+            container.innerHTML = resultsHTML;
+        }
+
+        // 渲染結算結果
+        function renderSettlementResult(transfers) {
+            const container = document.getElementById('settlement-paths');
+            
+            if (transfers.length === 0) {
+                container.innerHTML = '<blockquote>所有玩家已經平衡，無需轉帳。</blockquote>';
+            } else {
+                const transfersHTML = transfers.map(t => 
+                    '<blockquote><strong>' + t.from + '</strong> 付給 <strong>' + t.to + '</strong> <span style="color: var(--primary);">$' + t.amount + '</span></blockquote>'
+                ).join('');
+                container.innerHTML = transfersHTML;
+            }
+            
+            document.getElementById('settlement-result').style.display = 'block';
+        }
+
+        // 初始化應用程式
+        document.addEventListener('DOMContentLoaded', function() {
+            // 綁定玩家表單事件
+            document.getElementById('player-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const name = document.getElementById('player-name').value;
+                addPlayer(name);
+            });
+            
+            // 初始化渲染
+            renderPlayers();
+            renderTransactions();
+            renderPlayerSelect();
+            renderChipInputs();
+            updateSummary();
+        });
+    </script>
+</body>
+</html>
